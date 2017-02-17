@@ -18,6 +18,29 @@
 
 package org.xnio.nio;
 
+import org.jboss.logging.Logger;
+import org.xnio.Cancellable;
+import org.xnio.ChannelListener;
+import org.xnio.ChannelListeners;
+import org.xnio.ChannelPipe;
+import org.xnio.ClosedWorkerException;
+import org.xnio.FailedIoFuture;
+import org.xnio.FinishedIoFuture;
+import org.xnio.FutureResult;
+import org.xnio.IoFuture;
+import org.xnio.Option;
+import org.xnio.OptionMap;
+import org.xnio.Options;
+import org.xnio.ReadPropertyAction;
+import org.xnio.StreamConnection;
+import org.xnio.XnioExecutor;
+import org.xnio.XnioIoFactory;
+import org.xnio.XnioIoThread;
+import org.xnio.XnioWorker;
+import org.xnio.channels.BoundChannel;
+import org.xnio.channels.StreamSinkChannel;
+import org.xnio.channels.StreamSourceChannel;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
@@ -42,29 +65,6 @@ import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.jboss.logging.Logger;
-import org.xnio.Cancellable;
-import org.xnio.ChannelListener;
-import org.xnio.ChannelListeners;
-import org.xnio.ChannelPipe;
-import org.xnio.ClosedWorkerException;
-import org.xnio.FailedIoFuture;
-import org.xnio.FinishedIoFuture;
-import org.xnio.FutureResult;
-import org.xnio.IoFuture;
-import org.xnio.Option;
-import org.xnio.OptionMap;
-import org.xnio.Options;
-import org.xnio.ReadPropertyAction;
-import org.xnio.StreamConnection;
-import org.xnio.XnioExecutor;
-import org.xnio.XnioIoFactory;
-import org.xnio.XnioIoThread;
-import org.xnio.XnioWorker;
-import org.xnio.channels.BoundChannel;
-import org.xnio.channels.StreamSinkChannel;
-import org.xnio.channels.StreamSourceChannel;
-
 import static java.lang.System.identityHashCode;
 import static java.lang.System.nanoTime;
 import static java.util.concurrent.locks.LockSupport.park;
@@ -86,7 +86,7 @@ final class WorkerThread extends XnioIoThread implements XnioExecutor {
     private final Selector selector;
     private final Object workLock = new Object();
 
-    private final Queue<Runnable> selectorWorkQueue = new ArrayDeque<Runnable>();
+    private final Queue<Runnable> selectorWorkQueue = new CheckingConcurrentDeque<>(new ArrayDeque<Runnable>());
     private final TreeSet<TimeKey> delayWorkQueue = new TreeSet<TimeKey>();
 
     private volatile int state;
